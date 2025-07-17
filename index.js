@@ -31,6 +31,23 @@ const categoryMap = {
   PWD: ['PWDOPENS']
 };
 
+const nursingCategoryMap = {
+  SC: ['SC'],
+  ST: ['ST'],
+  'VJ-A': ['VJ-A'],
+  'NT-B': ['NT-B'],
+  'NT-C': ['NT-C'],
+  'NT-D': ['NT-D'],
+  OBC: ['OBC'],
+  SEBC: ['SEBC'],
+  EWS: ['EWS'],
+  OPEN: ['OPEN'],
+  D1: ['D1'],
+  D2: ['D2'],
+  ORPHEN: ['ORPHEN'],
+  PH: ['PH']
+};
+
 // 🧠 Initialize MongoDB
 async function initializeDatabase() {
   try {
@@ -54,30 +71,32 @@ app.get('/api/colleges', async (req, res) => {
 
     console.log('🔍 Search Parameters:', { category, rank, percentile, cities, courseType });
 
-    // ✅ Step 1: Validate courseType
-    if (!courseType || (courseType !== 'engineering' && courseType !== 'pharmacy')) {
+    if (!courseType || !['engineering', 'pharmacy', 'nursing'].includes(courseType)) {
       return res.status(400).json({ error: 'Invalid or missing courseType' });
     }
 
-    // ✅ Step 2: Determine collection name
-    const collectionName = courseType === 'pharmacy' ? 'college_list_pharma' : 'college_list';
+    let collectionName = 'college_list';
+    if (courseType === 'pharmacy') collectionName = 'college_list_pharma';
+    if (courseType === 'nursing') collectionName = 'college_list_nursing';
+
     const collection = db.collection(collectionName);
 
     let technicalCategories = [];
 
     if (Array.isArray(category)) {
       technicalCategories = category;
-    } else if (categoryMap[category]) {
-      technicalCategories = categoryMap[category];
     } else {
-      return res.status(400).json({ error: 'Invalid category provided' });
+      if (courseType === 'nursing') {
+        technicalCategories = nursingCategoryMap[category] || [];
+      } else {
+        technicalCategories = categoryMap[category] || [];
+      }
     }
 
     if (!rank && !percentile) {
       return res.status(400).json({ error: 'Rank or Percentile is required' });
     }
 
-    // ✅ Step 3: Build MongoDB query
     const query = {
       category: { $in: technicalCategories }
     };
@@ -97,8 +116,13 @@ app.get('/api/colleges', async (req, res) => {
       if (isNaN(parsedRank)) {
         return res.status(400).json({ error: 'Invalid rank format' });
       }
-      query.merit = { $gte: parsedRank };
-      sortField = { merit: 1 };
+      if (courseType === 'nursing') {
+        query.rank = { $gte: parsedRank };
+        sortField = { rank: 1 };
+      } else {
+        query.merit = { $gte: parsedRank };
+        sortField = { merit: 1 };
+      }
     } else if (percentile) {
       const parsedPercentile = parseFloat(percentile);
       if (isNaN(parsedPercentile)) {
@@ -123,8 +147,6 @@ app.get('/api/colleges', async (req, res) => {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
-
-
 
 // ✅ Health Check
 app.get('/api/health', (_req, res) => {
