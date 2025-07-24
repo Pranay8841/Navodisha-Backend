@@ -67,9 +67,9 @@ async function initializeDatabase() {
 // 🎯 Search API
 app.get('/api/colleges', async (req, res) => {
   try {
-    const { category, rank, percentile, cities, courseType } = req.query;
+    const { category, rank, percentile, cities, courseType, branch } = req.query;
 
-    console.log('🔍 Search Parameters:', { category, rank, percentile, cities, courseType });
+    console.log('🔍 Search Parameters:', { category, rank, percentile, cities, courseType, branch });
 
     if (!courseType || !['engineering', 'pharmacy', 'nursing'].includes(courseType)) {
       return res.status(400).json({ error: 'Invalid or missing courseType' });
@@ -109,6 +109,12 @@ app.get('/api/colleges', async (req, res) => {
       };
     }
 
+    if (branch) {
+      const escapeRegex = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const branchList = Array.isArray(branch) ? branch : [branch];
+      query.branch = { $in: branchList.map(c => new RegExp(`^${escapeRegex(c.trim())}$`, 'i')) };
+    }
+
     let sortField = {};
 
     if (rank) {
@@ -132,7 +138,7 @@ app.get('/api/colleges', async (req, res) => {
       sortField = { percentile: -1 };
     }
 
-    console.log('📦 Querying Collection:', collectionName);
+    // console.log('📦 Querying Collection:', collectionName);
     console.log('🔍 Final MongoDB Query:', query);
 
     const results = await collection
